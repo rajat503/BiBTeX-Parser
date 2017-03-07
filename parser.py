@@ -1,6 +1,27 @@
 import ply.lex as lex
 import ply.yacc as yacc
 
+import MySQLdb
+db = MySQLdb.connect("localhost","root","root","BibTex")
+cursor = db.cursor()
+
+records={}
+records['bibkey']="NULL"
+records['bibtype']="NULL"
+records['address']="NULL"
+records['author']="NULL"
+records['booktitle']="NULL"
+records['chapter']="NULL"
+records['edition']="NULL"
+records['journal']="NULL"
+records['number']="NULL"
+records['pages']="NULL"
+records['publisher']="NULL"
+records['school']="NULL"
+records['title']="NULL"
+records['volume']="NULL"
+records['year']="NULL"
+
 tokens = (
     'AT',
     'NEWLINE',
@@ -46,7 +67,6 @@ def t_error(t):
 def p_bibfile(p):
     'bibfile : entries'
     p[0] = p[1]
-    print p[0]
 
 def p_entries(p):
     '''entries : entry entries
@@ -55,18 +75,30 @@ def p_entries(p):
         p[0] = p[1]+p[2]
     else:
         p[0] = p[1]
-    print p[0]
 
 def p_entry(p):
     'entry : AT NAME LBRACE key COMMA fields RBRACE'
     p[0]=p[1]+p[2]+p[3]+p[4]+p[5]+p[6]+p[7]
-    print p[0]
+    records['bibkey']=p[4]
+    records['bibtype']=p[2]
+
+    #insert to db
+    print records
+    sql = "INSERT INTO entries(bibkey, bibtype, address, author, booktitle, chapter, edition, journal, number, pages, publisher, school, title, volume, year) \
+           VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s' )" % \
+           (records['bibkey'], records['bibtype'], records['address'], records['author'],records['booktitle'],records['chapter'],records['edition'],records['journal'],records['number'],records['pages'],records['publisher'],records['school'],records['title'],records['volume'],records['year'])
+
+    cursor.execute(sql)
+    db.commit()
+
+    for i in records.keys():
+        records[i]='NULL'
+
 
 def p_key(p):
     '''key : NAME
            | NUMBER'''
     p[0] = p[1]
-    print p[0]
 
 def p_fields(p):
     '''fields : field COMMA fields
@@ -76,19 +108,17 @@ def p_fields(p):
         p[0] = p[1]+p[2]+p[3]
     else:
         p[0] = p[1]
-    print p[0]
 
 def p_field(p):
     'field : NAME EQUALS LBRACE value RBRACE'
     p[0] = p[1]+p[2]+p[3]+p[4]+p[5]
-    print p[0]
+    records[p[1]]=p[4]
 
 def p_value(p):
     '''value : STRING
              | NUMBER
              | NAME'''
     p[0] = p[1]
-    print p[0]
 
 data = '''@article{key1,
 author = {{Sarkar, Santonu}},
@@ -103,11 +133,13 @@ year = {{1997}}
 lexer = lex.lex()
 lexer.input(data)
 
-while True:
-    tok = lexer.token()
-    if not tok:
-        break      # No more input
-    print(tok)
+# while True:
+#     tok = lexer.token()
+#     if not tok:
+#         break      # No more input
+#     print(tok)
 
 parser = yacc.yacc()
-print parser.parse(data)
+parser.parse(data)
+
+db.close()
